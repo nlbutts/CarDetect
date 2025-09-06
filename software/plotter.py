@@ -109,7 +109,8 @@ class PlotWindow(QWidget):
         self.stop_btn.clicked.connect(self.stop)
 
         self.plot_count = 0
-        self.plots = []
+        # persistent plot widgets to avoid flicker
+        self.plot_widgets = []  # each item: {'frame','pw','curve','label'}
 
     def start(self):
         if not self.reader.isRunning():
@@ -173,42 +174,52 @@ class PlotWindow(QWidget):
 
         print(f"Peak bin: {peak} + {delta:.3f} => freq={freq:.2f} Hz, velocity={velocity:.3f} m/s")
 
-        # plotting (positive half)
-        pw = pg.PlotWidget()
+        # prepare data for plotting
         freqs = np.linspace(0, FS / 2, len(mag))
-        pw.plot(freqs, 20 * np.log10(mag + 1e-12), pen=pg.mkPen(color=(200, 200, 0)))
-        pw.setTitle("Frame #{} (N={})".format(self.plot_count + 1, N))
-        pw.setLabel('left', 'Magnitude (dB)')
-        pw.setLabel('bottom', 'Frequency (Hz)')
-        pw.showGrid(x=True, y=True)
+        y = 20 * np.log10(mag + 1e-12)
 
-        # right-side textual pane showing peak information (large text)
         info = f"Peak bin: {peak} + {delta:.3f}\nfreq={freq:.2f} Hz\nvelocity={velocity:.3f} m/s"
-        label = QLabel(info)
-        font = QFont()
-        font.setPointSize(18)
-        font.setBold(True)
-        label.setFont(font)
-        label.setAlignment(Qt.AlignCenter)
-        label.setWordWrap(True)
 
-        # container to hold plot and text side-by-side
-        frame = QWidget()
-        h = QHBoxLayout(frame)
-        h.setContentsMargins(0, 0, 0, 0)
-        h.addWidget(pw, 3)
-        h.addWidget(label, 1)
+        # If we haven't yet created MAX_PLOTS widgets, create one now and store its curve/label.
+        if len(self.plot_widgets) < MAX_PLOTS:
+            pw = pg.PlotWidget()
+            curve = pw.plot(freqs, y, pen=pg.mkPen(color=(200, 200, 0)))
+            pw.setLabel('left', 'Magnitude (dB)')
+            pw.setLabel('bottom', 'Frequency (Hz)')
+            pw.showGrid(x=True, y=True)
+            # limit y-axis to [-60, +20] dB
+            pw.setYRange(-60, 20)
 
-        # add to layout
-        self.vbox.addWidget(frame)
-        self.plots.append(frame)
+            label = QLabel(info)
+            font = QFont()
+            font.setPointSize(18)
+            font.setBold(True)
+            label.setFont(font)
+            label.setAlignment(Qt.AlignCenter)
+            label.setWordWrap(True)
+
+            frame = QWidget()
+            h = QHBoxLayout(frame)
+            h.setContentsMargins(0, 0, 0, 0)
+            h.addWidget(pw, 3)
+            h.addWidget(label, 1)
+
+            self.vbox.addWidget(frame)
+            self.plot_widgets.append({'frame': frame, 'pw': pw, 'curve': curve, 'label': label})
+            # set the title once
+            pw.setTitle("Frame #{} (N={})".format(self.plot_count + 1, N))
+        else:
+            # reuse an existing widget in-place to avoid recreating widgets (no flicker)
+            idx = self.plot_count % MAX_PLOTS
+            item = self.plot_widgets[idx]
+            item['curve'].setData(freqs, y)
+            item['label'].setText(info)
+            item['pw'].setTitle("Frame #{} (N={})".format(self.plot_count + 1, N))
+            # ensure y-axis limit remains applied
+            item['pw'].setYRange(-60, 20)
+
         self.plot_count += 1
-
-        # keep only last MAX_PLOTS plots
-        while len(self.plots) > MAX_PLOTS:
-            old = self.plots.pop(0)
-            old.setParent(None)
-            old.deleteLater()
+        # (no widget deletion; we reuse widgets in-place)
 
     def on_error(self, err):
         self.status_label.setText("Error: see console")

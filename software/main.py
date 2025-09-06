@@ -103,7 +103,7 @@ def main():
             # print("Peak: {:.1f} Hz, amplitude: {:.4f}".format(peak_freq, peak_val))
 
             # small pause before next window (optional)
-            time.sleep_ms(10)
+            #time.sleep_ms(10)
 
     except KeyboardInterrupt:
         print("Stopped")
