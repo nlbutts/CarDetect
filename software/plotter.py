@@ -46,18 +46,18 @@ class SerialReader(QThread):
                         line = raw.decode(errors="ignore").strip()
                         if not line:
                             continue
-                        if line.startswith("DATA,"):
-                            # allow DATA,<val1>,<val2>,...
-                            parts = line.split(",", 1)[1]
-                            # parts may contain extra commas, so split and convert
+                        # Handle Python-list style bytes: b'[15235, 15171, ...]'
+                        if line.startswith('[') and line.endswith(']'):
+                            payload = line[1:-1].strip()
+                            if not payload:
+                                continue
                             try:
-                                vals = [float(x) for x in parts.split(",") if x != ""]
+                                vals = [float(x) for x in payload.split(',') if x.strip() != ""]
                                 if vals:
                                     self.frame_received.emit(vals)
                             except Exception:
-                                # ignore malformed frames but continue
+                                # malformed numeric data; ignore and continue
                                 continue
-                        # else ignore other messages
                     except Exception:
                         # If a read error occurs, emit and break
                         self.error.emit(traceback.format_exc())

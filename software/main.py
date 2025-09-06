@@ -42,6 +42,7 @@ def main():
     # Simple loop: read a status register and blink an LED if data-ready
     led = Pin(25, Pin.OUT)
     debug = Pin(15, Pin.OUT)
+    debug1 = Pin(16, Pin.OUT)
 
     # ADC on GP27
     adc = ADC(Pin(27))
@@ -56,6 +57,7 @@ def main():
     try:
         while True:
             led.toggle()
+            debug1.toggle()
             # capture N samples at fs using ticks_us for timing
             samples = []
             t0 = time.ticks_us()
@@ -74,11 +76,10 @@ def main():
             # send whole buffer as a single CSV line prefixed with "DATA,"
             # (easier to parse on host and avoids per-line overhead)
             try:
-                print("DATA," + ",".join("{:.6f}".format(s) for s in samples))
+                print(samples)
+                #print("DATA," + ",".join("{}".format(s) for s in samples))
             except Exception:
-                # fall back to simple prints if join fails
-                for s in samples:
-                    print("{:.6f}".format(s))
+                print("Exception")
 
             # # prepare complex array for FFT
             # xc = [complex(s, 0) for s in samples]
